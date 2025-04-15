@@ -2,13 +2,15 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-
 #include <getopt.h>
+#include "museum.cpp"
 
 using namespace std;
 int main(int argc, char* argv[]) {
 
-    
+    Paris m1;
+
+    m1.main();
     
     return 0;
 }
