@@ -2,16 +2,16 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <string>
 #include <vector>
 #include <iomanip> 
+#include <fstream>
+#include <sstream>
+#
 
 using namespace std;
 
-struct Location {
-    double longitude;
-    double latitude;
-    Location(double x_val, double y_val) : longitude(x_val), latitude(y_val) {};
-};
+
 
 
 struct Node{
@@ -29,9 +29,9 @@ struct Vertex{
 
 class Paris {
     private:
-        vector<Location> locations;
+        vector<string> locations; // holds monument names in order of adjacency matrix
         vector<Node> initial_graph; // holds x
-        vector< vector<double> > adj_matrix; // holds google maps walking distances
+        vector< vector<int> > adj_matrix; // holds google maps walking distances multiplied by 10x
         vector<size_t> curr_path;  // holds google maps walking distances
         vector<size_t> best_path;  // holds google maps walking distances
         double curr_distance;
@@ -40,44 +40,52 @@ class Paris {
     
     public:
         // input is in x coord, y coord
-        void read_input(){
-            int longitude;
-            int latitude;
-            int name;
+        void read_adj_matrix(const string& filename) {
+            vector<vector<string> > matrix;
+            ifstream file(filename);
+        
+            if (!file.is_open()) {
+                cerr << "Failed to open file." << endl;
+                return;
+            }
+        
+            string line;
+            while (getline(file, line)) {
+                vector<string> row;
+                stringstream ss(line);
+                string cell;
+        
+                while (getline(ss, cell, ',')) {
+                    row.push_back(cell);
+                }
+        
+                matrix.push_back(row);
+            }
+            file.close();
 
-            while(cin >> name){
-                cin >> longitude;
-                cin >> latitude;
-                Location new_coord = Location(longitude, latitude);
-                locations.push_back(new_coord);
+            adj_matrix.resize(locations.size());
+            for (int i = 0; i < matrix.size(); i++){
+                adj_matrix[i].resize(locations.size());
+                for (int j = 0; j < matrix.size(); j++){
+                    adj_matrix[i][j] = stoi(matrix[i][j]);
+                }
+            }
+            cout << "read in adj matrix" << endl;
+
+        }
+        void read_input(){
+            string name;
+
+            while(cin >> name){ 
+                locations.push_back(name);
             }
             initial_graph.resize(locations.size());
             locations.resize(locations.size());
             
         }
 
-        double find_distance(Location& a, Location& b){
-            // fill in with straight line distance between coords
-            // later update with google maps walking distance
-            // then with metro or bus
-            return -1;
-        }
 
 
-        // create graph adjacency matrix, set curr path to default
-        void set_variables(){
-            adj_matrix.resize(locations.size());
-            curr_path.resize(locations.size());
-            best_path.reserve(locations.size());
-
-            for (int i = 0; i < locations.size(); i++){
-                adj_matrix[i].resize(locations.size());
-                curr_path[i] = i;
-                for (int j = 0; j < locations.size(); j++){
-                    adj_matrix[i][j] = find_distance(locations[i], locations[j]);
-                }
-            }
-        }
         // create initial path that isn't optimal but also isn't random using arbitrary selection algorithm
         void arbitrary_selection(){
             // create initial tsp using arbitrary selection
@@ -87,7 +95,7 @@ class Paris {
                 // insert where path increase is minimized
 
             // initialize first two nodes with distance between themselves
-            double distance = find_distance(locations[0], locations[1]);
+            double distance = adj_matrix[0][1];
             initial_graph[0].next_node = 1;
             initial_graph[0].distance = distance;
             initial_graph[1].next_node = 0;
@@ -101,7 +109,7 @@ class Paris {
 
 
                 for (size_t vertex = 0; vertex < curr; vertex++){
-                    double curr_distance = find_distance(locations[vertex], locations[curr]) + find_distance(locations[curr], locations[initial_graph[vertex].next_node]);
+                    double curr_distance = adj_matrix[vertex][curr] + adj_matrix[curr][initial_graph[vertex].next_node];
                     if (curr_distance < min_distance){
                         curr_distance = min_distance;
                         insertion_point = vertex;
@@ -110,17 +118,24 @@ class Paris {
                 }
                 // update initial graph with node that minimizes increase in path length
                 initial_graph[insertion_point].next_node = curr;
-                initial_graph[insertion_point].distance = find_distance(locations[insertion_point], locations[curr]);
+                initial_graph[insertion_point].distance = adj_matrix[insertion_point][curr];
 
                 initial_graph[curr].next_node = next;
-                initial_graph[curr].distance = find_distance(locations[curr], locations[next]);
+                initial_graph[curr].distance = adj_matrix[curr][next];
 
             }
             return;
         }
 
-        // set best path and save distance to the heuristic solution for initial distance comparisons
+        // set curr path, best path and save distance to the heuristic solution for initial distance comparisons
+        // TODO: fix adding the last node that loops back to 0
         void set_best_path(){
+            curr_path.resize(locations.size());
+            best_path.reserve(locations.size());
+            for (int i = 0; i < locations.size(); i++){           
+                curr_path[i] = i;
+            }
+
             size_t curr_node = initial_graph[0].next_node;
             best_path.push_back(curr_node);
             best_distance += initial_graph[0].distance;
@@ -246,7 +261,6 @@ class Paris {
     
         void main(){
             read_input();
-            set_variables();
             arbitrary_selection();
             set_best_path();
 

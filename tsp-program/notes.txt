@@ -1,1 +1,6 @@
+preload adj matrix from csv
+need to change find_distance calculations to use the preloaded adj matrix from csv
 
+
+
+change to mix of metro and walking distances
