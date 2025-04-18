@@ -116,6 +116,7 @@ Best distance: 5171
 Best Path location count: 54
 
 
+120600000 is the count
 Arc De Triomphe 0
 1.3 km.
 MUSÉE DES ARTS ASIATIQUES GUIMET 15
