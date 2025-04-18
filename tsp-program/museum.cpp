@@ -29,76 +29,89 @@ struct Vertex{
 
 class Paris {
     private:
-        vector<string> locations; // holds monument names in order of adjacency matrix
+        vector< pair<string, size_t> > locations; // holds monument names and index in full list of monumentrs
         vector<Node> initial_graph; // holds x
         vector< vector<int> > adj_matrix;  // holds google maps walking distances multiplied by 10x
-        vector< vector<int> > full_adj_matrix; // holds google maps walking distances multiplied by 10x
         vector<size_t> curr_path;  // holds indecies of locations
         vector<size_t> best_path;  // holds indeces of locations
         double curr_distance;
         double best_distance;
         string adj_matrix_filename;
         string locations_filename;
+        string dist_from_paris_filename;
         int perm_count;
 
     
     public:
         // input is in x coord, y coord
-        Paris() : locations(), initial_graph(), adj_matrix(), curr_path(), best_path(), curr_distance(0), best_distance(0), adj_matrix_filename("distances/distances.csv"), locations_filename("distances/locations.txt"), perm_count(0) {}
-        void read_locations(const string& filename){
-            ifstream file(filename);
-        
+        Paris() : locations(), initial_graph(), adj_matrix(), curr_path(), best_path(), curr_distance(0), best_distance(0), adj_matrix_filename("distances/distances.csv"), locations_filename("distances/locations.txt"), dist_from_paris_filename("distances/distances_from_paris.txt"), perm_count(0) {}
+        void initialize_vars(int max_kilometers){
+
+            // read locations and distance from paris
+            vector<string> all_locations;
+            vector <int> dist_from_paris;
+
+            ifstream file(locations_filename);
             if (!file.is_open()) {
-                cerr << "Failed to open file.: " << filename << endl;
+                cerr << "Failed to open file.: " << locations_filename << endl;
                 return;
             }
         
             string line;
             while (getline(file, line)) {
-                locations.push_back(line);
+                all_locations.push_back(line);
             }
             file.close();
-        }
-
-        void print_locations(){
-            for (size_t i = 0; i < locations.size(); i++){
-                cout << locations[i] << endl;
+            
+            file.open(dist_from_paris_filename);
+            while (getline(file, line)) {
+                dist_from_paris.push_back(stoi(line));
             }
-            cout << locations.size() << "locations to visit" << endl;
-        }
+            file.close();
 
-        // read adj matrix and set initial graph for arbitrary selection
-        void read_adj_matrix(const string& filename) {
-            vector<vector<string> > matrix;
-            ifstream file(filename);
+            // get number of valid locations within 'max_kilometers' of paris
+
+            for (size_t i = 0; i < all_locations.size(); i++){
+                if (dist_from_paris[i] <= max_kilometers * 10){ // multipy by 10 because we store a decimal place in integer
+                    locations.push_back(make_pair(all_locations[i], i));
+                }
+            }
+
+
+            // read adj matrix from file
+            vector<vector<int> > matrix;
+            file.open(adj_matrix_filename);
         
             if (!file.is_open()) {
                 cerr << "Failed to open file." << endl;
                 return;
             }
         
-            string line;
             while (getline(file, line)) {
-                vector<string> row;
+                vector<int> row;
                 stringstream ss(line);
                 string cell;
         
                 while (getline(ss, cell, ',')) {
-                    row.push_back(cell);
+                    row.push_back(stoi(cell));
                 }
         
                 matrix.push_back(row);
             }
             file.close();
+            cout << "read full adj matrix completed" << endl;
 
             adj_matrix.resize(locations.size());
-            for (size_t i = 0; i < matrix.size(); i++){
+            for (size_t i = 0; i < locations.size(); i++){
                 adj_matrix[i].resize(locations.size());
-                for (size_t j = 0; j < matrix.size(); j++){
-                    adj_matrix[i][j] = stoi(matrix[i][j]);
+                for (size_t j = 0; j< locations.size(); j++){
+                    adj_matrix[i][j] = matrix[locations[i].second][locations[j].second];
                 }
+
             }
-            cout << "read adj matrix completed" << endl;
+            cout << "reduced adj matrix completed" << endl;
+
+
 
             initial_graph.resize(adj_matrix[0].size());
 
@@ -106,6 +119,13 @@ class Paris {
             
 
         }
+        void print_locations(){
+            for (size_t i = 0; i < locations.size(); i++){
+                cout << locations[i].first << endl;
+            }
+            cout << locations.size() << " locations to visit" << endl;
+        }
+
         void print_adj_matrix(){
             for (size_t i = 0; i < adj_matrix[0].size(); i++){
                 for (size_t j = 0; j < adj_matrix[0].size(); j++){
@@ -181,11 +201,13 @@ class Paris {
 
         void print_best_path(){
             for (size_t i = 0; i < best_path.size() - 1; i++){
-                cout << locations[best_path[i]]<< " " << best_path[i] << endl;
+                cout << locations[best_path[i]].first << " " << best_path[i] << endl;
                 cout << adj_matrix[best_path[i]][best_path[i+1]]/10.0 <<  " km." << endl;
             }
-            cout << "Best distance: " << best_distance << endl;
+            cout << locations[best_path[best_path.size() - 1]].first << " " << best_path[best_path.size() - 1] << endl;
+            cout << "Best distance: " << best_distance/10.0 << " total km." << endl;
             cout << "Best Path location count: " << locations.size() << endl;
+
         }
 
         // calculates distance from node 0 to perm_length along path
@@ -301,16 +323,14 @@ class Paris {
         }
     
         void main(){
-            read_locations(locations_filename);
-            read_adj_matrix(adj_matrix_filename);
+            initialize_vars(5);
             arbitrary_selection();
             set_intial_best_path();
             print_best_path();
 
-            //genPerms(1, perm_count);
+            genPerms(1, perm_count);
 
-            //print_best_path();
-            perm_count = 0;
+            print_best_path();
             
         }
 
