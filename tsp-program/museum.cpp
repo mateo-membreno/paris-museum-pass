@@ -31,15 +31,43 @@ class Paris {
     private:
         vector<string> locations; // holds monument names in order of adjacency matrix
         vector<Node> initial_graph; // holds x
-        vector< vector<int> > adj_matrix; // holds google maps walking distances multiplied by 10x
-        vector<size_t> curr_path;  // holds google maps walking distances
-        vector<size_t> best_path;  // holds google maps walking distances
+        vector< vector<int> > adj_matrix;  // holds google maps walking distances multiplied by 10x
+        vector< vector<int> > full_adj_matrix; // holds google maps walking distances multiplied by 10x
+        vector<size_t> curr_path;  // holds indecies of locations
+        vector<size_t> best_path;  // holds indeces of locations
         double curr_distance;
         double best_distance;
+        string adj_matrix_filename;
+        string locations_filename;
+        int perm_count;
 
     
     public:
         // input is in x coord, y coord
+        Paris() : locations(), initial_graph(), adj_matrix(), curr_path(), best_path(), curr_distance(0), best_distance(0), adj_matrix_filename("distances/distances.csv"), locations_filename("distances/locations.txt"), perm_count(0) {}
+        void read_locations(const string& filename){
+            ifstream file(filename);
+        
+            if (!file.is_open()) {
+                cerr << "Failed to open file.: " << filename << endl;
+                return;
+            }
+        
+            string line;
+            while (getline(file, line)) {
+                locations.push_back(line);
+            }
+            file.close();
+        }
+
+        void print_locations(){
+            for (size_t i = 0; i < locations.size(); i++){
+                cout << locations[i] << endl;
+            }
+            cout << locations.size() << "locations to visit" << endl;
+        }
+
+        // read adj matrix and set initial graph for arbitrary selection
         void read_adj_matrix(const string& filename) {
             vector<vector<string> > matrix;
             ifstream file(filename);
@@ -64,27 +92,28 @@ class Paris {
             file.close();
 
             adj_matrix.resize(locations.size());
-            for (int i = 0; i < matrix.size(); i++){
+            for (size_t i = 0; i < matrix.size(); i++){
                 adj_matrix[i].resize(locations.size());
-                for (int j = 0; j < matrix.size(); j++){
+                for (size_t j = 0; j < matrix.size(); j++){
                     adj_matrix[i][j] = stoi(matrix[i][j]);
                 }
             }
-            cout << "read in adj matrix" << endl;
+            cout << "read adj matrix completed" << endl;
 
-        }
-        void read_input(){
-            string name;
+            initial_graph.resize(adj_matrix[0].size());
 
-            while(cin >> name){ 
-                locations.push_back(name);
-            }
-            initial_graph.resize(locations.size());
-            locations.resize(locations.size());
+            cout << "arbitrary selection graph initialized" << endl;
             
+
         }
-
-
+        void print_adj_matrix(){
+            for (size_t i = 0; i < adj_matrix[0].size(); i++){
+                for (size_t j = 0; j < adj_matrix[0].size(); j++){
+                    cout << adj_matrix[i][j] << ",";
+                }
+                cout << endl;
+            }
+        }
 
         // create initial path that isn't optimal but also isn't random using arbitrary selection algorithm
         void arbitrary_selection(){
@@ -109,41 +138,54 @@ class Paris {
 
 
                 for (size_t vertex = 0; vertex < curr; vertex++){
-                    double curr_distance = adj_matrix[vertex][curr] + adj_matrix[curr][initial_graph[vertex].next_node];
+                    double curr_distance = adj_matrix[vertex][curr] + adj_matrix[curr][initial_graph[vertex].next_node] - adj_matrix[vertex][initial_graph[vertex].next_node];
                     if (curr_distance < min_distance){
-                        curr_distance = min_distance;
+                        min_distance = curr_distance;
                         insertion_point = vertex;
                         next = initial_graph[vertex].next_node;
                     }
                 }
                 // update initial graph with node that minimizes increase in path length
-                initial_graph[insertion_point].next_node = curr;
-                initial_graph[insertion_point].distance = adj_matrix[insertion_point][curr];
-
                 initial_graph[curr].next_node = next;
                 initial_graph[curr].distance = adj_matrix[curr][next];
 
+                initial_graph[insertion_point].next_node = curr;
+                initial_graph[insertion_point].distance = adj_matrix[insertion_point][curr];
+
+
             }
+            cout << "completed arbitrary selection" << endl;
             return;
         }
 
         // set curr path, best path and save distance to the heuristic solution for initial distance comparisons
         // TODO: fix adding the last node that loops back to 0
-        void set_best_path(){
+        void set_intial_best_path(){
             curr_path.resize(locations.size());
             best_path.reserve(locations.size());
-            for (int i = 0; i < locations.size(); i++){           
+            for (size_t i = 0; i < locations.size(); i++){           
                 curr_path[i] = i;
             }
 
             size_t curr_node = initial_graph[0].next_node;
-            best_path.push_back(curr_node);
+            best_path.push_back(0);
             best_distance += initial_graph[0].distance;
             while(curr_node != 0){
                 best_path.push_back(curr_node);
                 best_distance += initial_graph[curr_node].distance;
                 curr_node = initial_graph[curr_node].next_node;
             }
+            // remove loop back to start
+            best_distance -= initial_graph[curr_node].distance;
+        }
+
+        void print_best_path(){
+            for (size_t i = 0; i < best_path.size() - 1; i++){
+                cout << locations[best_path[i]]<< " " << best_path[i] << endl;
+                cout << adj_matrix[best_path[i]][best_path[i+1]]/10.0 <<  " km." << endl;
+            }
+            cout << "Best distance: " << best_distance << endl;
+            cout << "Best Path location count: " << locations.size() << endl;
         }
 
         // calculates distance from node 0 to perm_length along path
@@ -164,19 +206,18 @@ class Paris {
             }
         }
 
-
         double find_opttsp_mst(size_t permLength){
             double mst_cost = 0;
             // need to initialize prim table to current path length
             vector<Vertex> prims_table;
             prims_table.resize(curr_path.size() - permLength);
-    
+
             prims_table[0].distance = 0;
-    
+
             for (size_t i = 0; i < prims_table.size(); i++){
                 double min_distance = numeric_limits<double>::infinity();
                 size_t min_vertex = 0;
-    
+
                 // step 1
                 for (size_t v = 0; v < prims_table.size(); v++){
                     if (prims_table[v].visited == false && prims_table[v].distance < min_distance) {
@@ -186,7 +227,7 @@ class Paris {
                 }
                 // step 2
                 prims_table[min_vertex].visited = true;
-    
+
                 // step 3
                 for (size_t v = 0; v < prims_table.size(); v++){
                     double new_distance = adj_matrix[curr_path[min_vertex + permLength]][curr_path[v + permLength]];
@@ -197,41 +238,43 @@ class Paris {
                 }
             }
             // find cost of mst
-            for (int i = 0; i < prims_table.size(); i++){
+            for (size_t i = 0; i < prims_table.size(); i++){
                 mst_cost += prims_table[i].distance;
             }
-    
+
             // MST ALGO WORKS 
-    
+
             double curr_edge = 0;
-            
-            //connect end of current path with mst to get estimate
-            double min_edge = numeric_limits<double>::infinity();
+            //now connect beginning and end of curr_path with the closest vertex in path
+
+            double min_edge_two = numeric_limits<double>::infinity();
             for (size_t i = permLength; i < curr_path.size(); i++){
                 curr_edge = adj_matrix[curr_path[permLength - 1]][curr_path[i]];
-                if (curr_edge < min_edge) min_edge = curr_edge;
+                if (curr_edge < min_edge_two) min_edge_two = curr_edge;
             }
-            return mst_cost + sqrt(min_edge);
+            return mst_cost + min_edge_two;
         }
 
-        // check if remainder of locations create a promising path that is less than the 
         bool promising(size_t permLength) {
             // estimate is mst NOT full cycle
             // estimate <= tsp
             // this guarantees that if curr_distance + estimate >= best distance, our current distance isn't optimal
             // so we can stop searching that branch becasue everything after it will be worse
-    
+
+            // connect path[0] and path[permLength - 1] to mst 
+            // add those lengths to estimate
             if(curr_path.size() - permLength < 6){
                 return true;
             }
-    
+
             double estimate = find_opttsp_mst(permLength);
             curr_distance = calculate_distance(permLength);
             if (curr_distance + estimate >= best_distance) return false;
             return true;
         }
-    
-        void genPerms(size_t permLength) {
+
+        void genPerms(size_t permLength, int& count) {
+            
             // counter for infinite recursion purposes
             //cout << counter << '\n';
             //counter++;
@@ -242,30 +285,33 @@ class Paris {
             if (!promising(permLength)) {
                 return;
             }
-    
+
             for (size_t i = permLength; i < curr_path.size(); ++i) {
                 swap(curr_path[permLength], curr_path[i]);
-                genPerms(permLength + 1);
+                count += 1;
+                if (count % 100000 == 0){
+                    cout << count << " is the count" << endl;
+                }
+                if (count % 100000000 == 0){
+                    print_best_path();
+                }
+                genPerms(permLength + 1, count);
                 swap(curr_path[permLength], curr_path[i]);
             }
-        }
-    
-        void print_best_path(){
-            cout << fixed << setprecision(2) << best_distance << '\n';
-            cout << best_path[0];
-            for (size_t i = 1; i < best_path.size(); i++){
-                cout << ' ' << best_path[i];
-            }
-            cout << '\n';
         }
     
         void main(){
-            read_input();
+            read_locations(locations_filename);
+            read_adj_matrix(adj_matrix_filename);
             arbitrary_selection();
-            set_best_path();
+            set_intial_best_path();
+            print_best_path();
 
-            genPerms(1);
+            //genPerms(1, perm_count);
 
+            //print_best_path();
+            perm_count = 0;
+            
         }
 
 

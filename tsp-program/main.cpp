@@ -6,7 +6,7 @@
 #include "museum.cpp"
 
 using namespace std;
-int main(int argc, char* argv[]) {
+int main() {
 
     Paris m1;
 

@@ -4,3 +4,5 @@ need to change find_distance calculations to use the preloaded adj matrix from c
 
 
 change to mix of metro and walking distances
+
+
